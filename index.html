@@ -1,0 +1,452 @@
+<!-- START OF FILE: 3x3_Fixed_Core_Edition.html -->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>三阶玄机 - 定海神针</title>
+    <style>
+        body {
+            margin: 0; overflow: hidden; background-color: #050505;
+            font-family: "Microsoft YaHei", sans-serif; user-select: none;
+        }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        h1 { 
+            margin: 0; color: #d4af37; letter-spacing: 4px; font-size: 28px; font-weight: bold;
+            text-shadow: 0 2px 15px rgba(212, 175, 55, 0.5);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 5px;
+        }
+        p { font-size: 12px; color: #886b4b; margin: 5px 0 10px 0; letter-spacing: 1px; }
+
+        .color-legend { display: flex; gap: 5px; margin-top: 8px; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid #444; }
+
+        .controls {
+            position: absolute; bottom: 40px; width: 100%;
+            display: flex; justify-content: center; gap: 25px;
+            pointer-events: auto; z-index: 20;
+        }
+        button {
+            background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(10px);
+            border: 1px solid #5c4033; color: #d4af37;
+            padding: 12px 32px; font-size: 14px; border-radius: 25px; 
+            cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5); outline: none; font-weight: bold;
+        }
+        button:hover { background: #2e2018; border-color: #ffd700; color: #fff; transform: translateY(-2px); }
+        button:active { transform: scale(0.96); }
+        
+        #victory-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s ease; z-index: 50;
+            background: rgba(0,0,0,0.9);
+        }
+        #victory-overlay.show { opacity: 1; pointer-events: auto; }
+        .win-text {
+            font-size: 60px; font-weight: 300; color: #d4af37; font-family: serif;
+            text-shadow: 0 0 40px rgba(212, 175, 55, 0.6); letter-spacing: 10px;
+            border-top: 1px solid #d4af37; border-bottom: 1px solid #d4af37; 
+            padding: 30px 0; margin-bottom: 30px;
+        }
+
+        #sound-menu {
+            position: absolute; bottom: 100px; left: 50%;
+            transform: translateX(-50%) scale(0);
+            background: rgba(20, 12, 8, 0.98);
+            border: 1px solid #5c4033; padding: 15px; border-radius: 12px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto; width: 340px; z-index: 30;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.9); transform-origin: bottom center;
+        }
+        #sound-menu.open { transform: translateX(-50%) scale(1); }
+        .sound-item {
+            background: #1a100b; padding: 10px 5px; border-radius: 6px;
+            text-align: center; color: #aa8866; font-size: 12px;
+            cursor: pointer; border: 1px solid transparent; transition: 0.2s;
+        }
+        .sound-item.active { background: #5c4033; color: #fff; border-color: #d4af37; }
+    </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>三阶 · 定海神针</h1>
+        <p>Fixed Core Edition</p>
+        <div class="color-legend">
+            <div class="legend-dot" style="background:#e6e6e6"></div>
+            <div class="legend-dot" style="background:#ffd700"></div>
+            <div class="legend-dot" style="background:#b90000"></div>
+            <div class="legend-dot" style="background:#ff5900"></div>
+            <div class="legend-dot" style="background:#009e60"></div>
+            <div class="legend-dot" style="background:#0045ad"></div>
+        </div>
+    </div>
+
+    <div id="victory-overlay">
+        <div class="win-text">浑然天成</div>
+        <div style="display:flex; gap:20px;">
+            <button onclick="event.stopPropagation(); game.reset()">归位</button>
+            <button onclick="event.stopPropagation(); game.shuffle()">再破一阵</button>
+        </div>
+    </div>
+
+    <div id="sound-menu">
+        <div class="sound-item" onclick="audioMgr.set('mech')">⚙️ 机械</div>
+        <div class="sound-item active" onclick="audioMgr.set('wood')">🪵 沉香</div>
+        <div class="sound-item" onclick="audioMgr.set('stone')">🪨 磐石</div>
+        <div class="sound-item" onclick="audioMgr.set('glass')">🍷 琉璃</div>
+        <div class="sound-item" onclick="audioMgr.set('mute')">🔇 静音</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="event.stopPropagation(); toggleMenu()">🎵 听觉</button>
+        <button onclick="event.stopPropagation(); game.shuffle()">🔀 乱阵</button>
+    </div>
+
+<script>
+/* 1. 音频引擎 */
+class SoundEngine {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.type = 'wood'; 
+    }
+    init() { if(this.ctx.state==='suspended') this.ctx.resume(); }
+    set(key) { this.type=key; this.init(); this.play(); document.getElementById('sound-menu').classList.remove('open'); }
+    play() {
+        if(this.type==='mute') return;
+        this.init(); const t=this.ctx.currentTime;
+        const osc=this.ctx.createOscillator(); const g=this.ctx.createGain();
+        osc.connect(g); g.connect(this.ctx.destination);
+        
+        if(this.type==='wood') {
+            osc.type='sine'; osc.frequency.setValueAtTime(100,t); osc.frequency.exponentialRampToValueAtTime(40,t+0.15);
+            g.gain.setValueAtTime(0.8,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.18);
+            osc.start(t); osc.stop(t+0.2);
+        } else if (this.type==='stone') {
+            osc.type='triangle'; osc.frequency.setValueAtTime(150,t); osc.frequency.linearRampToValueAtTime(50,t+0.1);
+            g.gain.setValueAtTime(0.6,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+            osc.start(t); osc.stop(t+0.15);
+        } else {
+            osc.frequency.setValueAtTime(300,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+            osc.start(t); osc.stop(t+0.1);
+        }
+    }
+    playWin() {
+        if(this.type==='mute')return; this.init(); const t=this.ctx.currentTime;
+        [196,261,329,392,523].forEach((f,i)=>{
+            const o=this.ctx.createOscillator();const g=this.ctx.createGain();o.connect(g).connect(this.ctx.destination);
+            o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0,t+i*0.2);g.gain.linearRampToValueAtTime(0.2,t+i*0.2+0.1);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.2+3);
+            o.start(t+i*0.2);o.stop(t+i*0.2+3.5);
+        });
+    }
+}
+const audioMgr = new SoundEngine();
+
+/* 2. 纹理工厂 (包含包金木纹 & 黑金核心) */
+const TextureFactory = {
+    cache: {},
+    // 创建外层木头纹理
+    createWood: function(colorHex, isInner=false) {
+        const k = colorHex + (isInner?'_in':'_out');
+        if(this.cache[k]) return this.cache[k];
+        
+        const size = 512; const canvas = document.createElement('canvas'); canvas.width=size; canvas.height=size;
+        const ctx = canvas.getContext('2d');
+        const col = new THREE.Color(colorHex);
+        
+        if(isInner) ctx.fillStyle = '#1a120b';
+        else ctx.fillStyle = `rgb(${col.r*180}, ${col.g*180}, ${col.b*180})`;
+        ctx.fillRect(0,0,size,size);
+        
+        // 木纹
+        ctx.globalAlpha = 0.12; ctx.globalCompositeOperation = 'multiply';
+        for(let i=0;i<8000;i++) {
+            ctx.fillStyle = Math.random()>0.5?'#000':'#4e342e';
+            ctx.fillRect(Math.random()*size,Math.random()*size,Math.random()*60+20,2);
+        }
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1.0;
+
+        if(!isInner) {
+            // 光影
+            const grad = ctx.createRadialGradient(size/2,size/2,size*0.3,size/2,size/2,size*0.9);
+            grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.5)');
+            ctx.fillStyle = grad; ctx.fillRect(0,0,size,size);
+            
+            // 包金边框
+            const r=60; const p=20;
+            ctx.beginPath(); ctx.moveTo(p+r,p); ctx.arcTo(size-p,p,size-p,size-p,r); ctx.arcTo(size-p,size-p,p,size-p,r); ctx.arcTo(p,size-p,p,p,r); ctx.arcTo(p,p,size-p,p,r);
+            ctx.lineWidth=26; ctx.strokeStyle='#ffd700'; ctx.stroke(); // 粗金边
+            
+            // 装饰线
+            ctx.lineWidth=4; ctx.strokeStyle='#ffe082'; ctx.strokeRect(60,60,size-120,size-120);
+            
+            // 回纹
+            const m=size/2; const s=30;
+            ctx.strokeStyle='#d4af37'; ctx.lineWidth=6;
+            ctx.strokeRect(m-s,m-s,s*2,s*2);
+        } else {
+             // 内部面暗角
+             const grad = ctx.createRadialGradient(size/2,size/2,size*0.2,size/2,size/2,size*0.9);
+             grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.9)');
+             ctx.fillStyle = grad; ctx.fillRect(0,0,size,size);
+        }
+
+        const tex = new THREE.CanvasTexture(canvas); tex.anisotropy=8;
+        this.cache[k] = tex; return tex;
+    },
+    // 创建核心纹理
+    createObsidian: function() {
+        if(this.cache['obs']) return this.cache['obs'];
+        const size = 512; const canvas = document.createElement('canvas'); canvas.width=size; canvas.height=size;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#000000'; ctx.fillRect(0,0,size,size);
+        // 熔岩金裂纹
+        ctx.strokeStyle = '#ffaa00'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.shadowBlur=10; ctx.shadowColor='#ffaa00';
+        ctx.beginPath();
+        ctx.moveTo(100,100); ctx.bezierCurveTo(200,150,300,50,400,100);
+        ctx.moveTo(50,400); ctx.bezierCurveTo(150,300,350,450,450,350);
+        ctx.stroke();
+        
+        // 符文
+        ctx.strokeStyle = 'rgba(255,215,0,0.5)'; ctx.lineWidth=2; ctx.shadowBlur=0;
+        ctx.strokeRect(150,150,212,212);
+        ctx.beginPath(); ctx.arc(256,256,60,0,Math.PI*2); ctx.stroke();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        this.cache['obs'] = tex; return tex;
+    }
+};
+
+/* 3. 游戏核心 */
+class CoreGame {
+    constructor() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x050505);
+        this.scene.fog = new THREE.FogExp2(0x050505, 0.06);
+
+        // 3x3 视角拉近
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+        this.camera.position.set(6, 5, 7); 
+        
+        this.renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, powerPreference:"high-performance"});
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 120Hz 优化
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(this.renderer.domElement);
+
+        // 灯光
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        const spot = new THREE.SpotLight(0xffeeb1, 1.8);
+        spot.position.set(8, 12, 8); spot.castShadow = true;
+        spot.shadow.mapSize.width = 2048; spot.shadow.mapSize.height = 2048;
+        this.scene.add(spot);
+        const rim = new THREE.PointLight(0x4466ff, 0.8); rim.position.set(-5, 0, -5); this.scene.add(rim);
+
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+
+        this.blocks = [];
+        this.gap = new THREE.Vector3();
+        this.animating = false;
+        
+        this.initMaterials();
+        this.initLevel();
+        
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        window.addEventListener('pointerup', e => this.onClick(e));
+        window.addEventListener('resize', ()=>{
+            this.camera.aspect = window.innerWidth/window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        this.animate();
+    }
+
+    initMaterials() {
+        const colors = { U:0xe6e6e6, D:0xffd700, R:0xb90000, L:0xff5900, F:0x009e60, B:0x0045ad, IN:0x1a120b };
+        this.mats = {};
+        for(let k in colors) {
+            const isInner = k==='IN';
+            const t = TextureFactory.createWood(colors[k], isInner);
+            this.mats[k] = new THREE.MeshStandardMaterial({
+                map:t, roughness: isInner?0.9:0.2, metalness: isInner?0.0:0.2,
+                bumpMap:t, bumpScale:0.01
+            });
+        }
+        const obs = TextureFactory.createObsidian();
+        this.coreMat = new THREE.MeshStandardMaterial({
+            map: obs, color: 0xffffff, roughness: 0.1, metalness: 0.6, emissive: 0x331100, emissiveIntensity: 0.5
+        });
+    }
+
+    initLevel() {
+        this.blocks.forEach(b => this.scene.remove(b.mesh));
+        this.blocks = [];
+        if(this.fixedCore) this.scene.remove(this.fixedCore);
+
+        // 圆角几何体：大小0.96，间隙很小，看起来很紧凑
+        const geo = new THREE.RoundedBoxGeometry(0.96, 0.96, 0.96, 4, 0.12);
+
+        // 3x3 循环
+        for(let z=-1; z<=1; z++) {
+            for(let y=-1; y<=1; y++) {
+                for(let x=-1; x<=1; x++) {
+                    
+                    // 1. 核心：(0,0,0) 是固定的
+                    if (x===0 && y===0 && z===0) {
+                        const cGeo = new THREE.RoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.15);
+                        this.fixedCore = new THREE.Mesh(cGeo, this.coreMat);
+                        this.fixedCore.position.set(0,0,0);
+                        // 核心内部发光
+                        this.fixedCore.add(new THREE.PointLight(0xffaa00, 1.5, 4));
+                        this.scene.add(this.fixedCore);
+                        continue; // 核心不加入 blocks，不可移动
+                    }
+
+                    // 2. 缺口：(1,1,1) 初始为空
+                    if (x===1 && y===1 && z===1) {
+                        this.gap.set(x,y,z);
+                        continue;
+                    }
+
+                    // 3. 普通方块 (26 - 1 = 25 个)
+                    const mats = [
+                        x===1 ? this.mats.R : this.mats.IN, // Right
+                        x===-1 ? this.mats.L : this.mats.IN, // Left
+                        y===1 ? this.mats.U : this.mats.IN, // Up
+                        y===-1 ? this.mats.D : this.mats.IN, // Down
+                        z===1 ? this.mats.F : this.mats.IN, // Front
+                        z===-1 ? this.mats.B : this.mats.IN  // Back
+                    ];
+                    
+                    const mesh = new THREE.Mesh(geo, mats);
+                    mesh.position.set(x, y, z);
+                    mesh.castShadow = true; mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    
+                    this.blocks.push({
+                        mesh: mesh,
+                        solved: new THREE.Vector3(x, y, z)
+                    });
+                }
+            }
+        }
+    }
+
+    onClick(e) {
+        if(document.getElementById('victory-overlay').classList.contains('show')) return;
+        if(e.target.closest('button') || e.target.closest('#sound-menu')) return;
+        if(this.animating) return;
+
+        this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        // 只能点击移动方块
+        const intersects = this.raycaster.intersectObjects(this.blocks.map(b=>b.mesh));
+
+        if(intersects.length > 0) {
+            const blk = this.blocks.find(b => b.mesh === intersects[0].object);
+            if(blk) this.move(blk);
+        }
+    }
+
+    move(blk) {
+        const dist = blk.mesh.position.distanceTo(this.gap);
+        
+        if(dist > 0.9 && dist < 1.1) {
+            // 可以移动
+            audioMgr.set('wood'); 
+            this.animating = true;
+            
+            const targetPos = this.gap.clone();
+            this.gap.copy(blk.mesh.position);
+            
+            new TWEEN.Tween(blk.mesh.position).to(targetPos, 130)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .onComplete(() => {
+                    this.animating = false;
+                    this.checkWin();
+                }).start();
+        } else {
+            // 试图穿过核心移动是不允许的（距离会是 sqrt(2) 或 2），
+            // 或者试图移动不相邻的块
+            if(dist < 2.5) audioMgr.set('stone'); 
+        }
+    }
+
+    reset() {
+        TWEEN.removeAll();
+        this.animating = false;
+        document.getElementById('victory-overlay').classList.remove('show');
+        this.initLevel();
+    }
+
+    shuffle() {
+        this.reset();
+        let steps = 60;
+        const run = () => {
+            if(steps <= 0) return;
+            const neighbors = this.blocks.filter(b => b.mesh.position.distanceTo(this.gap) < 1.1);
+            if(neighbors.length > 0) {
+                const r = neighbors[Math.floor(Math.random() * neighbors.length)];
+                const temp = this.gap.clone();
+                this.gap.copy(r.mesh.position);
+                r.mesh.position.copy(temp);
+            }
+            steps--;
+            setTimeout(run, 15);
+        };
+        run();
+    }
+
+    checkWin() {
+        if(this.animating) return;
+        let win = true;
+        for(let b of this.blocks) {
+            if(b.mesh.position.distanceTo(b.solved) > 0.05) {
+                win = false; break;
+            }
+        }
+        if(win) {
+            document.getElementById('victory-overlay').classList.add('show');
+            audioMgr.playWin();
+        }
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        TWEEN.update();
+        this.controls.update();
+        
+        // 核心自转特效 (在缝隙中可见)
+        if(this.fixedCore) {
+            this.fixedCore.rotation.y -= 0.005;
+            this.fixedCore.rotation.x += 0.002;
+        }
+        
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+function toggleMenu() { document.getElementById('sound-menu').classList.toggle('open'); }
+
+const game = new CoreGame();
+</script>
+</body>
+</html>
